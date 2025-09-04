@@ -76,18 +76,23 @@ async def google_callback_get(
 @router.post("/google/callback")
 async def google_callback_post(request: Request):
     """Handle callback code exchange from frontend"""
-    data = await request.json()
-    code = data.get('code')
-    error = data.get('error')
     try:
+        data = await request.json()
+        code = data.get('code')
+        error = data.get('error')
+        
+        print(f"Received POST callback with code: {code[:10]}..." if code else "No code received")
+        
         if error:
-            # Handle OAuth error
-            return RedirectResponse(url="http://localhost:3000/?error=" + error)
+            raise HTTPException(status_code=400, detail=f"OAuth error: {error}")
 
         if not code:
             raise HTTPException(status_code=400, detail="Authorization code is required")
 
-        token = await oauth_client.get_access_token(code, REDIRECT_URI)
+        callback_uri = os.getenv("REDIRECT_URI", "https://conv-api-vercel-backend.vercel.app/api/auth/callback")
+        print(f"Using callback URI: {callback_uri}")
+        
+        token = await oauth_client.get_access_token(code, callback_uri)
 
         if not token:
             raise HTTPException(status_code=400, detail="Failed to get access token")
