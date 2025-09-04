@@ -1,17 +1,15 @@
 from fastapi import APIRouter, HTTPException, Request, Depends
-from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from google.cloud import geminidataanalytics
 from google.api_core import exceptions as google_exceptions
 from typing import List, Optional
 import uuid
 import os
-
-security = HTTPBearer()
 from datetime import datetime
 from pydantic import BaseModel
 from google.protobuf.json_format import MessageToDict
 from dotenv import load_dotenv
-from .auth import SCOPES
+from .auth import validate_token
+from google.oauth2.credentials import Credentials
 
 load_dotenv(override=True)
 
@@ -64,30 +62,19 @@ class DataAgentResponse(BaseModel):
 
 router = APIRouter()
 
-from .auth_utils import validate_token
-from google.oauth2.credentials import Credentials
-
-async def get_credentials(auth: HTTPAuthorizationCredentials = Depends(security)):
-    """Create Google credentials from Bearer token"""
-    try:
-        token = auth.credentials
-        
-        # Create credentials object directly from the token
-        creds = Credentials(
-            token=token,
-            token_uri="https://oauth2.googleapis.com/token",
-            client_id=os.getenv("GOOGLE_CLIENT_ID"),
-            client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-            scopes=SCOPES
-        )
-        return creds
-    except Exception as e:
-        print(f"Error creating credentials: {str(e)}")  # Add logging
-        raise HTTPException(status_code=401, detail=f"Failed to create credentials: {str(e)}")
+from .auth import validate_token  # Import the existing auth validation
 
 @router.get("/")
-async def list_agents(creds = Depends(get_credentials)):
+async def list_agents(token_info = Depends(validate_token)):
     """List all data agents"""
+    # Create credentials from validated token
+    creds = Credentials(
+        token=token_info["access_token"],
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=os.getenv("GOOGLE_CLIENT_ID"),
+        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+        scopes=token_info["scope"].split()
+    )
     try:
         import logging
         logging.basicConfig(level=logging.DEBUG)
@@ -143,8 +130,16 @@ async def list_agents(creds = Depends(get_credentials)):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 @router.post("/")
-async def create_agent(agent_data: DataAgentRequest, creds = Depends(get_credentials)):
+async def create_agent(agent_data: DataAgentRequest, token_info = Depends(validate_token)):
     """Create a new data agent"""
+    # Create credentials from validated token
+    creds = Credentials(
+        token=token_info["access_token"],
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=os.getenv("GOOGLE_CLIENT_ID"),
+        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+        scopes=token_info["scope"].split()
+    )
     try:
         client = geminidataanalytics.DataAgentServiceClient(credentials=creds)
 
@@ -213,8 +208,16 @@ async def create_agent(agent_data: DataAgentRequest, creds = Depends(get_credent
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 @router.put("/{agent_name}")
-async def update_agent(agent_name: str, agent_data: DataAgentUpdateRequest, creds = Depends(get_credentials)):
+async def update_agent(agent_name: str, agent_data: DataAgentUpdateRequest, token_info = Depends(validate_token)):
     """Update an existing data agent"""
+    # Create credentials from validated token
+    creds = Credentials(
+        token=token_info["access_token"],
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=os.getenv("GOOGLE_CLIENT_ID"),
+        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+        scopes=token_info["scope"].split()
+    )
     try:
         client = geminidataanalytics.DataAgentServiceClient(credentials=creds)
 
@@ -256,8 +259,16 @@ async def update_agent(agent_name: str, agent_data: DataAgentUpdateRequest, cred
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 @router.delete("/projects/{project_id}/locations/{location}/dataAgents/{agent_id}")
-async def delete_agent(project_id: str, location: str, agent_id: str, creds = Depends(get_credentials)):
+async def delete_agent(project_id: str, location: str, agent_id: str, token_info = Depends(validate_token)):
     agent_name = f"projects/{project_id}/locations/{location}/dataAgents/{agent_id}"
+    # Create credentials from validated token
+    creds = Credentials(
+        token=token_info["access_token"],
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=os.getenv("GOOGLE_CLIENT_ID"),
+        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+        scopes=token_info["scope"].split()
+    )
     print(f"Deleting agent with name: {agent_name}")  # Debugging log
     try:
         client = geminidataanalytics.DataAgentServiceClient(credentials=creds)
