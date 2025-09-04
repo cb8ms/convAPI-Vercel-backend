@@ -212,6 +212,54 @@ def format_datasource(datasource) -> Dict[str, Any]:
 
     return ds_info
 
+@router.get("/conversations/{conversation_name:path}/messages")
+async def get_messages(conversation_name: str, token_info = Depends(validate_token)):
+    """Get all messages for a conversation. conversation_name is the full path."""
+    try:
+        print(f"DEBUG: Fetching messages for conversation: {conversation_name}")
+        
+        # Create credentials from token_info
+        from google.oauth2.credentials import Credentials
+        creds = Credentials(
+            token=token_info["token"],
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=os.getenv("GOOGLE_CLIENT_ID"),
+            client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+            scopes=token_info["token_info"].get("scope", "").split()
+        )
+        
+        client = geminidataanalytics.DataChatServiceClient(credentials=creds)
+
+        request = geminidataanalytics.ListMessagesRequest(parent=conversation_name)
+        msgs = list(client.list_messages(request=request))
+        print(f"DEBUG: Found {len(msgs)} messages")
+
+        # Convert messages to our format
+        messages = []
+        for msg_wrapper in msgs:
+            try:
+                message = msg_wrapper.message
+                formatted_msg = format_message_response(message)
+                messages.append(formatted_msg)
+            except Exception as msg_error:
+                print(f"DEBUG: Error formatting message: {str(msg_error)}")
+                continue
+
+        # Sort by timestamp if available
+        messages.sort(key=lambda x: x.get('timestamp') or '', reverse=False)
+        print(f"DEBUG: Returning {len(messages)} formatted messages")
+
+        return {"messages": messages}
+
+    except google_exceptions.GoogleAPICallError as e:
+        print(f"DEBUG: Google API error fetching messages: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"API error fetching messages: {str(e)}")
+    except Exception as e:
+        print(f"DEBUG: Unexpected error fetching messages: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+
 @router.get("/conversations/{agent_name:path}")
 async def list_conversations(agent_name: str, token_info = Depends(validate_token)):
     """List conversations for a specific agent"""
@@ -243,12 +291,17 @@ async def list_conversations(agent_name: str, token_info = Depends(validate_toke
         agent_convos = []
         for c in convos:
             if c.agents:
+                print(f"DEBUG: Checking conversation {c.name} with agents: {list(c.agents)}")
                 # Check if agent_name is in the agents list
                 if agent_name in c.agents:
+                    print(f"DEBUG: Exact match found for agent {agent_name}")
                     agent_convos.append(c)
                 # Also check if the agent name matches partially (in case of different formats)
                 elif any(agent_name.split('/')[-1] in agent for agent in c.agents):
+                    print(f"DEBUG: Partial match found for agent {agent_name}")
                     agent_convos.append(c)
+                else:
+                    print(f"DEBUG: No match for agent {agent_name} in conversation {c.name}")
 
         print(f"DEBUG: Filtered to {len(agent_convos)} conversations for agent {agent_name}")
         if convos:
