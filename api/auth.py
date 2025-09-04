@@ -178,3 +178,5 @@ async def validate_token(credentials: HTTPAuthorizationCredentials = Depends(sec
 async def logout():
     """Handle logout (client-side token clearing)"""
     return {"message": "Logged out successfully"}
+
+__all__ = ["router", "validate_token"]
