@@ -1,9 +1,12 @@
 from fastapi import APIRouter, HTTPException, Request, Depends
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from google.cloud import geminidataanalytics
 from google.api_core import exceptions as google_exceptions
 from typing import List, Optional
 import uuid
 import os
+
+security = HTTPBearer()
 from datetime import datetime
 from pydantic import BaseModel
 from google.protobuf.json_format import MessageToDict
@@ -64,11 +67,14 @@ router = APIRouter()
 from .auth_utils import validate_token
 from google.oauth2.credentials import Credentials
 
-async def get_credentials(token_info = Depends(validate_token)):
-    """Create Google credentials from validated token"""
+async def get_credentials(auth: HTTPAuthorizationCredentials = Depends(security)):
+    """Create Google credentials from Bearer token"""
     try:
+        token = auth.credentials
+        
+        # Create credentials object directly from the token
         creds = Credentials(
-            token=token_info['access_token'],
+            token=token,
             token_uri="https://oauth2.googleapis.com/token",
             client_id=os.getenv("GOOGLE_CLIENT_ID"),
             client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
