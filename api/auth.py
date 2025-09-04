@@ -1,14 +1,18 @@
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, HTTPException, Request, Depends
 from fastapi.responses import RedirectResponse
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 import os
+import httpx
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import GetAccessTokenError
 from google.oauth2.credentials import Credentials
 from google.oauth2 import id_token
 from google.auth.transport import requests
-from typing import Optional
+from typing import Optional, Dict
 from dotenv import load_dotenv
 import json
+
+security = HTTPBearer()
 
 load_dotenv(override=True)
 
@@ -129,6 +133,46 @@ async def google_callback_post(request: Request):
         raise HTTPException(status_code=401, detail="Failed to get access token")
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+async def validate_token(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Dict:
+    """Validate a token using Google's tokeninfo endpoint"""
+    try:
+        token = credentials.credentials
+        
+        # Verify the token with Google's tokeninfo endpoint
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f'https://www.googleapis.com/oauth2/v1/tokeninfo',
+                params={'access_token': token}
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Invalid token"
+                )
+            
+            token_info = response.json()
+            
+            # Verify the token belongs to our application
+            if token_info.get('aud') != GOOGLE_CLIENT_ID:
+                raise HTTPException(
+                    status_code=401,
+                    detail="Token was not issued for this application"
+                )
+            
+            return token_info
+            
+    except httpx.RequestError as e:
+        raise HTTPException(
+            status_code=401,
+            detail=f"Failed to validate token: {str(e)}"
+        )
+    except Exception as e:
+        raise HTTPException(
+            status_code=401,
+            detail=f"Authentication failed: {str(e)}"
+        )
 
 @router.get("/logout")
 async def logout():
