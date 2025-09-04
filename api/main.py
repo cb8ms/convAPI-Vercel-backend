@@ -38,4 +38,4 @@ app.include_router(chat_router, prefix="/api/chat", tags=["chat"])
 
 @app.get("/")
 async def root():
-    return RedirectResponse(url="/api/auth/login")
+    return RedirectResponse(url="/api/auth/google/url")

@@ -39,8 +39,8 @@ oauth_client = GoogleOAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
 
 router = APIRouter()
 
-@router.get("/login")
-async def login():
+@router.get("/google/url")
+async def get_google_url():
     """Get Google OAuth authorization URL"""
     try:
         auth_url = await oauth_client.get_authorization_url(
@@ -52,9 +52,14 @@ async def login():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get auth URL: {str(e)}")
 
-@router.get("/callback")
-async def callback(code: str = None, error: str = None):
+from fastapi import Request
+
+@router.post("/google/callback")
+async def google_callback(request: Request):
     """Handle OAuth callback and exchange code for tokens"""
+    data = await request.json()
+    code = data.get('code')
+    error = data.get('error')
     try:
         if error:
             # Handle OAuth error
@@ -87,16 +92,17 @@ async def callback(code: str = None, error: str = None):
             "expiry": creds.expiry.isoformat() if creds.expiry else ""
         }
 
-        # Build query string for redirect
-        from urllib.parse import urlencode
-        query = urlencode({f"cred_{k}": v for k, v in creds_dict.items() if v is not None})
-        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
-        return RedirectResponse(url=f"{frontend_url}/?{query}")
+        # Return the access token directly
+        return {
+            "access_token": creds.token,
+            "token_type": "Bearer",
+            "expires_in": 3600  # Google's default expiration time
+        }
 
     except GetAccessTokenError as e:
-        return RedirectResponse(url="http://localhost:3000/?error=access_token_error")
+        raise HTTPException(status_code=401, detail="Failed to get access token")
     except Exception as e:
-        return RedirectResponse(url=f"http://localhost:3000/?error=server_error&detail={str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/logout")
 async def logout():
