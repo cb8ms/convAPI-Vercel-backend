@@ -130,14 +130,19 @@ async def list_agents(token_info = Depends(validate_token)):
 @router.post("/")
 async def create_agent(agent_data: DataAgentRequest, token_info = Depends(validate_token)):
     """Create a new data agent"""
-    # Create credentials from validated token
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger("create_agent")
+
+    logger.info(f"Token info received: {token_info}")
     creds = Credentials(
         token=token_info["access_token"],
         token_uri="https://oauth2.googleapis.com/token",
         client_id=os.getenv("GOOGLE_CLIENT_ID"),
         client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-        scopes=token_info["scope"].split()
+        scopes=token_info.get("scope", "").split()
     )
+    logger.info(f"Created Google Credentials: {creds}")
     try:
         client = geminidataanalytics.DataAgentServiceClient(credentials=creds)
 
@@ -208,14 +213,19 @@ async def create_agent(agent_data: DataAgentRequest, token_info = Depends(valida
 @router.put("/{agent_name}")
 async def update_agent(agent_name: str, agent_data: DataAgentUpdateRequest, token_info = Depends(validate_token)):
     """Update an existing data agent"""
-    # Create credentials from validated token
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger("update_agent")
+
+    logger.info(f"Token info received: {token_info}")
     creds = Credentials(
         token=token_info["access_token"],
         token_uri="https://oauth2.googleapis.com/token",
         client_id=os.getenv("GOOGLE_CLIENT_ID"),
         client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-        scopes=token_info["scope"].split()
+        scopes=token_info.get("scope", "").split()
     )
+    logger.info(f"Created Google Credentials: {creds}")
     try:
         client = geminidataanalytics.DataAgentServiceClient(credentials=creds)
 
@@ -259,29 +269,34 @@ async def update_agent(agent_name: str, agent_data: DataAgentUpdateRequest, toke
 @router.delete("/projects/{project_id}/locations/{location}/dataAgents/{agent_id}")
 async def delete_agent(project_id: str, location: str, agent_id: str, token_info = Depends(validate_token)):
     agent_name = f"projects/{project_id}/locations/{location}/dataAgents/{agent_id}"
-    # Create credentials from validated token
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger("delete_agent")
+
+    logger.info(f"Token info received: {token_info}")
     creds = Credentials(
         token=token_info["access_token"],
         token_uri="https://oauth2.googleapis.com/token",
         client_id=os.getenv("GOOGLE_CLIENT_ID"),
         client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-        scopes=token_info["scope"].split()
+        scopes=token_info.get("scope", "").split()
     )
-    print(f"Deleting agent with name: {agent_name}")  # Debugging log
+    logger.info(f"Created Google Credentials: {creds}")
+    logger.info(f"Deleting agent with name: {agent_name}")
     try:
         client = geminidataanalytics.DataAgentServiceClient(credentials=creds)
 
         request = geminidataanalytics.DeleteDataAgentRequest(name=agent_name)
-        print(f"DeleteDataAgentRequest created: {request}")  # Debugging log
+        logger.info(f"DeleteDataAgentRequest created: {request}")
 
         response = client.delete_data_agent(request=request)
-        print(f"DeleteDataAgentResponse: {response}")  # Debugging log
+        logger.info(f"DeleteDataAgentResponse: {response}")
 
         return {"message": "Agent successfully deleted"}
 
     except google_exceptions.GoogleAPICallError as e:
-        print(f"Google API Call Error: {str(e)}")  # Debugging log
+        logger.error(f"Google API Call Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"API error deleting agent: {str(e)}")
     except Exception as e:
-        print(f"Unexpected Error: {str(e)}")  # Debugging log
+        logger.error(f"Unexpected Error: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
