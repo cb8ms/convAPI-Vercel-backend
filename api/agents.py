@@ -67,39 +67,37 @@ from .auth import validate_token  # Import the existing auth validation
 @router.get("/")
 async def list_agents(token_info = Depends(validate_token)):
     """List all data agents"""
-    # Create credentials from validated token
-    creds = Credentials(
-        token=token_info["access_token"],
-        token_uri="https://oauth2.googleapis.com/token",
-        client_id=os.getenv("GOOGLE_CLIENT_ID"),
-        client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-        scopes=token_info["scope"].split()
-    )
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger("list_agents")
+
+    logger.info(f"Token info received: {token_info}")
     try:
-        import logging
-        logging.basicConfig(level=logging.DEBUG)
-        logger = logging.getLogger("list_agents")
+        creds = Credentials(
+            token=token_info["access_token"],
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=os.getenv("GOOGLE_CLIENT_ID"),
+            client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+            scopes=token_info.get("scope", "").split()
+        )
+        logger.info(f"Created Google Credentials: {creds}")
 
-        logger.debug("Initializing DataAgentServiceClient with provided credentials.")
         client = geminidataanalytics.DataAgentServiceClient(credentials=creds)
+        logger.info(f"Initialized DataAgentServiceClient for project: {PROJECT_ID}")
 
-        logger.debug("Creating ListDataAgentsRequest for project: %s", PROJECT_ID)
         request = geminidataanalytics.ListDataAgentsRequest(
             parent=f"projects/{PROJECT_ID}/locations/global"
         )
-
-        logger.debug("Sending request to list data agents.")
+        logger.info("Sending request to list data agents.")
         agents = list(client.list_data_agents(request=request))
-        logger.debug("Received %d agents from the API.", len(agents))
+        logger.info(f"Received {len(agents)} agents from the API.")
 
         response = []
         for agent in agents:
             try:
-                # Convert protobuf to dict and then manually build the response
                 agent_dict = MessageToDict(agent._pb)
-                logger.debug("Processing agent: %s", agent_dict.get("name", "Unknown"))
+                logger.debug(f"Processing agent: {agent_dict.get('name', 'Unknown')}")
 
-                # Ensure create_time and update_time are properly formatted
                 if 'createTime' in agent_dict and agent_dict['createTime']:
                     agent_dict['create_time'] = agent.create_time.isoformat()
                 else:
@@ -110,24 +108,24 @@ async def list_agents(token_info = Depends(validate_token)):
                 else:
                     agent_dict['update_time'] = None
 
-                # Extract nested fields safely
                 published_context = agent_dict.get('dataAnalyticsAgent', {}).get('publishedContext', {})
                 agent_dict['system_instruction'] = published_context.get('systemInstruction')
                 agent_dict['datasource_references'] = published_context.get('datasourceReferences')
 
                 response.append(agent_dict)
             except Exception as agent_error:
-                logger.error("Error processing agent: %s", str(agent_error), exc_info=True)
+                logger.error(f"Error processing agent: {str(agent_error)}", exc_info=True)
 
-        logger.debug("Successfully processed all agents.")
+        logger.info("Successfully processed all agents.")
         return {"agents": response}
 
     except google_exceptions.GoogleAPICallError as e:
-        logger.error("Google API call error: %s", str(e), exc_info=True)
+        logger.error(f"Google API call error: {str(e)}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"API error fetching agents: {str(e)}")
     except Exception as e:
-        logger.error("Unexpected error: %s", str(e), exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
+        logger.error(f"Unexpected error: {str(e)}", exc_info=True)
+        logger.error(f"Credentials used: {creds}")
+        raise HTTPException(status_code=401, detail=f"Agent access unauthorized: {str(e)}")
 
 @router.post("/")
 async def create_agent(agent_data: DataAgentRequest, token_info = Depends(validate_token)):
