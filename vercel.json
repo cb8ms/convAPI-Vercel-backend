@@ -1,13 +1,13 @@
 {
   "functions": {
-    "api/*.py": {
-      "runtime": "python3.9"
+    "api/index.py": {
+      "runtime": "python3.12"
     }
   },
   "rewrites": [
     {
       "source": "/api/(.*)",
-      "destination": "/api/$1"
+      "destination": "/api/index.py"
     }
   ]
 }
