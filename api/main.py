@@ -5,7 +5,6 @@ from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
 from typing import Optional
-import uvicorn
 from mangum import Mangum
 
 # Import our API modules
@@ -31,9 +30,10 @@ app = FastAPI(
 )
 
 # CORS middleware
+frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],  # Next.js dev server
+    allow_origins=[frontend_url],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -54,6 +54,4 @@ async def health_check():
 
 handler = Mangum(app)
 
-if __name__ == "__main__":
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run(app, host="0.0.0.0", port=port)
+handler = Mangum(app)
