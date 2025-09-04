@@ -39,6 +39,11 @@ if not all((
     REDIRECT_URI,
     PROJECT_ID
 )):
+    print(f"Missing environment variables:")
+    print(f"GOOGLE_CLIENT_ID: {'SET' if GOOGLE_CLIENT_ID else 'MISSING'}")
+    print(f"GOOGLE_CLIENT_SECRET: {'SET' if GOOGLE_CLIENT_SECRET else 'MISSING'}")
+    print(f"REDIRECT_URI: {'SET' if REDIRECT_URI else 'MISSING'}")
+    print(f"PROJECT_ID: {'SET' if PROJECT_ID else 'MISSING'}")
     raise ValueError("Missing required environment variables. Check .env file.")
 
 oauth_client = GoogleOAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
@@ -136,8 +141,15 @@ async def google_callback_post(request: Request):
 
 async def validate_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Validate a token using Google's tokeninfo endpoint"""
+    import logging
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger("validate_token")
+
     try:
         token = credentials.credentials
+        logger.info(f"Raw credentials: {credentials}")
+        logger.info(f"Token extracted: {token[:20]}...")
+        logger.info(f"Token length: {len(token)}")
 
         # Verify the token with Google's tokeninfo endpoint
         async with httpx.AsyncClient() as client:
@@ -146,35 +158,49 @@ async def validate_token(credentials: HTTPAuthorizationCredentials = Depends(sec
                 params={'access_token': token}
             )
 
+            logger.info(f"Tokeninfo response status: {response.status_code}")
+
             if response.status_code != 200:
+                logger.error(f"Token validation failed with status: {response.status_code}")
                 raise HTTPException(
                     status_code=401,
                     detail="Invalid token"
                 )
 
             token_info = response.json()
+            logger.info(f"Token info received: {token_info}")
 
             # Verify the token belongs to our application
-            if token_info.get('aud') != GOOGLE_CLIENT_ID:
+            expected_aud = GOOGLE_CLIENT_ID
+            actual_aud = token_info.get('aud')
+            logger.info(f"GOOGLE_CLIENT_ID: {expected_aud}")
+            logger.info(f"Token audience: {actual_aud}")
+
+            if actual_aud != expected_aud:
+                logger.error(f"Token audience mismatch. Expected: {expected_aud}, Got: {actual_aud}")
                 raise HTTPException(
                     status_code=401,
                     detail="Token was not issued for this application"
                 )
 
+            logger.info("Token validation successful")
             return token_info
 
+    except HTTPException:
+        # Re-raise HTTPExceptions as-is
+        raise
     except httpx.RequestError as e:
+        logger.error(f"HTTP request error during token validation: {str(e)}")
         raise HTTPException(
             status_code=401,
             detail=f"Failed to validate token: {str(e)}"
         )
     except Exception as e:
+        logger.error(f"Unexpected error during token validation: {str(e)}")
         raise HTTPException(
             status_code=401,
             detail=f"Authentication failed: {str(e)}"
-        )
-
-@router.get("/logout")
+        )@router.get("/logout")
 async def logout():
     """Handle logout (client-side token clearing)"""
     return {"message": "Logged out successfully"}
