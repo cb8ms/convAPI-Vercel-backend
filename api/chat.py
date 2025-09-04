@@ -11,9 +11,13 @@ import pandas as pd
 from dotenv import load_dotenv
 import asyncio
 
+from .auth import validate_token
+
 load_dotenv(override=True)
 
 PROJECT_ID = os.getenv("PROJECT_ID")
+LOOKER_CLIENT_ID = os.getenv("LOOKER_CLIENT_ID")
+LOOKER_CLIENT_SECRET = os.getenv("LOOKER_CLIENT_SECRET")
 LOOKER_CLIENT_ID = os.getenv("LOOKER_CLIENT_ID")
 LOOKER_CLIENT_SECRET = os.getenv("LOOKER_CLIENT_SECRET")
 
@@ -36,28 +40,6 @@ class ChatResponse(BaseModel):
     messages: List[MessageResponse]
 
 router = APIRouter()
-
-def get_credentials(request: Request):
-    """Extract credentials from request headers"""
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Authorization header missing or invalid")
-
-    try:
-        creds_data = auth_header.replace("Bearer ", "")
-        creds_dict = json.loads(creds_data)
-        from google.oauth2.credentials import Credentials
-        creds = Credentials(
-            token=creds_dict["token"],
-            refresh_token=creds_dict.get("refresh_token"),
-            token_uri=creds_dict["token_uri"],
-            client_id=creds_dict["client_id"],
-            client_secret=creds_dict["client_secret"],
-            scopes=creds_dict["scopes"],
-        )
-        return creds
-    except Exception as e:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
 
 def is_looker_agent(agent) -> bool:
     """Check if agent uses Looker datasource"""
@@ -230,11 +212,22 @@ def format_datasource(datasource) -> Dict[str, Any]:
 
     return ds_info
 
-@router.get("/conversations/{agent_name}")
-async def list_conversations(agent_name: str, creds=Depends(get_credentials)):
+@router.get("/conversations/{agent_name:path}")
+async def list_conversations(agent_name: str, token_info = Depends(validate_token)):
     """List conversations for a specific agent"""
     try:
         print(f"DEBUG: Fetching conversations for agent: {agent_name}")
+        
+        # Create credentials from token_info
+        from google.oauth2.credentials import Credentials
+        creds = Credentials(
+            token=token_info["token"],
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=os.getenv("GOOGLE_CLIENT_ID"),
+            client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+            scopes=token_info["token_info"].get("scope", "").split()
+        )
+        
         client = geminidataanalytics.DataChatServiceClient(credentials=creds)
 
         request = geminidataanalytics.ListConversationsRequest(
@@ -287,10 +280,21 @@ async def list_conversations(agent_name: str, creds=Depends(get_credentials)):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 @router.post("/conversations")
-async def create_conversation(agent_name: str, creds=Depends(get_credentials)):
+async def create_conversation(agent_name: str, token_info = Depends(validate_token)):
     """Create a new conversation for an agent"""
     try:
         print(f"DEBUG: Creating conversation for agent: {agent_name}")
+        
+        # Create credentials from token_info
+        from google.oauth2.credentials import Credentials
+        creds = Credentials(
+            token=token_info["token"],
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=os.getenv("GOOGLE_CLIENT_ID"),
+            client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+            scopes=token_info["token_info"].get("scope", "").split()
+        )
+        
         client = geminidataanalytics.DataChatServiceClient(credentials=creds)
 
         conversation = geminidataanalytics.Conversation()
@@ -324,10 +328,21 @@ async def create_conversation(agent_name: str, creds=Depends(get_credentials)):
         raise HTTPException(status_code=500, detail=f"Unexpected error: {str(e)}")
 
 @router.get("/conversations/{conversation_name:path}/messages")
-async def get_messages(conversation_name: str, creds=Depends(get_credentials)):
+async def get_messages(conversation_name: str, token_info = Depends(validate_token)):
     """Get all messages for a conversation. conversation_name is the full path."""
     try:
         print(f"DEBUG: Fetching messages for conversation: {conversation_name}")
+        
+        # Create credentials from token_info
+        from google.oauth2.credentials import Credentials
+        creds = Credentials(
+            token=token_info["token"],
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=os.getenv("GOOGLE_CLIENT_ID"),
+            client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+            scopes=token_info["token_info"].get("scope", "").split()
+        )
+        
         client = geminidataanalytics.DataChatServiceClient(credentials=creds)
 
         request = geminidataanalytics.ListMessagesRequest(parent=conversation_name)
@@ -364,10 +379,20 @@ from fastapi.responses import StreamingResponse
 import json
 
 @router.post("/conversations/{conversation_name:path}/messages")
-async def send_message(conversation_name: str, message_req: MessageRequest, agent_name: str = None, creds=Depends(get_credentials)):
+async def send_message(conversation_name: str, message_req: MessageRequest, agent_name: str = None, token_info = Depends(validate_token)):
     """Send a message to a conversation and get streaming response."""
     async def chat_stream():
         try:
+            # Create credentials from token_info
+            from google.oauth2.credentials import Credentials
+            creds = Credentials(
+                token=token_info["token"],
+                token_uri="https://oauth2.googleapis.com/token",
+                client_id=os.getenv("GOOGLE_CLIENT_ID"),
+                client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+                scopes=token_info["token_info"].get("scope", "").split()
+            )
+            
             client = geminidataanalytics.DataChatServiceClient(credentials=creds)
 
             # First, get the agent to check if it's a Looker agent
