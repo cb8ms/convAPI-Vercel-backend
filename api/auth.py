@@ -4,6 +4,8 @@ import os
 from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import GetAccessTokenError
 from google.oauth2.credentials import Credentials
+from google.oauth2 import id_token
+from google.auth.transport import requests
 from typing import Optional
 from dotenv import load_dotenv
 import json
@@ -116,9 +118,17 @@ async def google_callback_post(request: Request):
             "expiry": creds.expiry.isoformat() if creds.expiry else ""
         }
 
-        # Return the access token directly
+        # Get ID token for the user
+        id_token_info = id_token.verify_oauth2_token(
+            creds.token,
+            requests.Request(),
+            GOOGLE_CLIENT_ID
+        )
+
+        # Return both access token and id token
         return {
             "access_token": creds.token,
+            "id_token": id_token_info,
             "token_type": "Bearer",
             "expires_in": 3600  # Google's default expiration time
         }

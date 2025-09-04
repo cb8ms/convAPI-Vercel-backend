@@ -8,6 +8,7 @@ from datetime import datetime
 from pydantic import BaseModel
 from google.protobuf.json_format import MessageToDict
 from dotenv import load_dotenv
+from .auth import SCOPES
 
 load_dotenv(override=True)
 
@@ -60,31 +61,22 @@ class DataAgentResponse(BaseModel):
 
 router = APIRouter()
 
-def get_credentials(request: Request):
-    """Extract credentials from request headers"""
-    auth_header = request.headers.get("Authorization")
-    if not auth_header or not auth_header.startswith("Bearer "):
-        raise HTTPException(status_code=401, detail="Authorization header missing or invalid")
+from .auth_utils import validate_token
+from google.oauth2.credentials import Credentials
 
-    # For now, we'll expect the credentials to be passed in the Authorization header
-    # In a production app, you'd validate JWT tokens or use sessions
-    creds_data = auth_header.replace("Bearer ", "")
-
+async def get_credentials(token_info = Depends(validate_token)):
+    """Create Google credentials from validated token"""
     try:
-        import json
-        creds_dict = json.loads(creds_data)
-        from google.oauth2.credentials import Credentials
         creds = Credentials(
-            token=creds_dict["token"],
-            refresh_token=creds_dict.get("refresh_token"),
-            token_uri=creds_dict["token_uri"],
-            client_id=creds_dict["client_id"],
-            client_secret=creds_dict["client_secret"],
-            scopes=creds_dict["scopes"],
+            token=token_info['access_token'],
+            token_uri="https://oauth2.googleapis.com/token",
+            client_id=os.getenv("GOOGLE_CLIENT_ID"),
+            client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
+            scopes=SCOPES  # Make sure to import SCOPES from auth.py
         )
         return creds
     except Exception as e:
-        raise HTTPException(status_code=401, detail="Invalid credentials")
+        raise HTTPException(status_code=401, detail=f"Failed to create credentials: {str(e)}")
 
 @router.get("/")
 async def list_agents(creds = Depends(get_credentials)):
