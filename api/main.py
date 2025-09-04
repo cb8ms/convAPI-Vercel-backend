@@ -8,9 +8,15 @@ from typing import Optional
 from mangum import Mangum
 
 # Import our API modules
-from .auth import router as auth_router
-from .agents import router as agents_router
-from .chat import router as chat_router
+import sys
+import os
+
+# Add the parent directory to sys.path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from api.auth import router as auth_router
+from api.agents import router as agents_router
+from api.chat import router as chat_router
 
 load_dotenv(override=True)
 
@@ -52,6 +58,4 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
-handler = Mangum(app)
-
-handler = Mangum(app)
+handler = Mangum(app, lifespan="off")
