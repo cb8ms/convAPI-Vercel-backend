@@ -172,7 +172,7 @@ async def validate_token(credentials: HTTPAuthorizationCredentials = Depends(sec
 
             # Verify the token belongs to our application
             expected_aud = GOOGLE_CLIENT_ID
-            actual_aud = token_info.get('aud')
+            actual_aud = token_info.get('audience')  # Google uses 'audience', not 'aud'
             logger.info(f"GOOGLE_CLIENT_ID: {expected_aud}")
             logger.info(f"Token audience: {actual_aud}")
 
@@ -183,7 +183,7 @@ async def validate_token(credentials: HTTPAuthorizationCredentials = Depends(sec
                     detail="Token was not issued for this application"
                 )
 
-            logger.info("Token validation successful")
+            logger.info("Token validation successful - audience matches")
             return token_info
 
     except HTTPException:
