@@ -5,7 +5,10 @@ from httpx_oauth.clients.google import GoogleOAuth2
 from httpx_oauth.oauth2 import GetAccessTokenError
 from google.oauth2.credentials import Credentials
 from typing import Optional
+from dotenv import load_dotenv
 import json
+
+load_dotenv(override=True)
 
 SCOPES = [
     "openid",
@@ -30,7 +33,7 @@ if not all((
     REDIRECT_URI,
     PROJECT_ID
 )):
-    raise ValueError("Missing required environment variables. Check Vercel environment variables.")
+    raise ValueError("Missing required environment variables. Check .env file.")
 
 oauth_client = GoogleOAuth2(GOOGLE_CLIENT_ID, GOOGLE_CLIENT_SECRET)
 
@@ -54,8 +57,8 @@ async def callback(code: str = None, error: str = None):
     """Handle OAuth callback and exchange code for tokens"""
     try:
         if error:
-            frontend_base = os.getenv("FRONTEND_URL", "http://localhost:3000")
-            return RedirectResponse(url=f"{frontend_base}/?error=" + error)
+            # Handle OAuth error
+            return RedirectResponse(url="http://localhost:3000/?error=" + error)
 
         if not code:
             raise HTTPException(status_code=400, detail="Authorization code is required")
@@ -87,16 +90,13 @@ async def callback(code: str = None, error: str = None):
         # Build query string for redirect
         from urllib.parse import urlencode
         query = urlencode({f"cred_{k}": v for k, v in creds_dict.items() if v is not None})
-        frontend_base = os.getenv("FRONTEND_URL", "http://localhost:3000")
-        frontend_url = f"{frontend_base}/?{query}"
-        return RedirectResponse(url=frontend_url)
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        return RedirectResponse(url=f"{frontend_url}/?{query}")
 
     except GetAccessTokenError as e:
-        frontend_base = os.getenv("FRONTEND_URL", "http://localhost:3000")
-        return RedirectResponse(url=f"{frontend_base}/?error=access_token_error")
+        return RedirectResponse(url="http://localhost:3000/?error=access_token_error")
     except Exception as e:
-        frontend_base = os.getenv("FRONTEND_URL", "http://localhost:3000")
-        return RedirectResponse(url=f"{frontend_base}/?error=server_error&detail={str(e)}")
+        return RedirectResponse(url=f"http://localhost:3000/?error=server_error&detail={str(e)}")
 
 @router.get("/logout")
 async def logout():
