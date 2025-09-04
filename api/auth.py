@@ -142,14 +142,16 @@ async def google_callback_post(request: Request):
 async def validate_token(credentials: HTTPAuthorizationCredentials = Depends(security)):
     """Validate a token using Google's tokeninfo endpoint"""
     import logging
-    logging.basicConfig(level=logging.DEBUG)
+    logging.basicConfig(level=logging.WARNING)  # Only log warnings and errors
     logger = logging.getLogger("validate_token")
 
     try:
         token = credentials.credentials
-        logger.info(f"Raw credentials: {credentials}")
-        logger.info(f"Token extracted: {token[:20]}...")
-        logger.info(f"Token length: {len(token)}")
+        
+        # Only log token details if there's an issue
+        # logger.info(f"Raw credentials: {credentials}")
+        # logger.info(f"Token extracted: {token[:20]}...")
+        # logger.info(f"Token length: {len(token)}")
 
         # Verify the token with Google's tokeninfo endpoint
         async with httpx.AsyncClient() as client:
@@ -158,24 +160,21 @@ async def validate_token(credentials: HTTPAuthorizationCredentials = Depends(sec
                 params={'access_token': token}
             )
 
-            logger.info(f"Tokeninfo response status: {response.status_code}")
-
+            # Only log if there's an issue
             if response.status_code != 200:
-                logger.error(f"Token validation failed with status: {response.status_code}")
+                logger.warning(f"Token validation failed with status: {response.status_code}")
                 raise HTTPException(
                     status_code=401,
                     detail="Invalid token"
                 )
 
             token_info = response.json()
-            logger.info(f"Token info received: {token_info}")
+            # logger.info(f"Token info received: {token_info}")
 
             # Verify the token belongs to our application
             expected_aud = GOOGLE_CLIENT_ID
             actual_aud = token_info.get('audience')  # Google uses 'audience', not 'aud'
-            logger.info(f"GOOGLE_CLIENT_ID: {expected_aud}")
-            logger.info(f"Token audience: {actual_aud}")
-
+            
             if actual_aud != expected_aud:
                 logger.error(f"Token audience mismatch. Expected: {expected_aud}, Got: {actual_aud}")
                 raise HTTPException(
@@ -183,7 +182,7 @@ async def validate_token(credentials: HTTPAuthorizationCredentials = Depends(sec
                     detail="Token was not issued for this application"
                 )
 
-            logger.info("Token validation successful - audience matches")
+            # Token validation successful - don't log success to reduce noise
             return {"token": token, "token_info": token_info}
 
     except HTTPException:
