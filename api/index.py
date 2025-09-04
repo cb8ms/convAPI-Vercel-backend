@@ -1,22 +1,12 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from mangum import Mangum
 import os
 from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv(override=True)
 
-# Import your existing routers
-from .auth import router as auth_router
-from .agents import router as agents_router  
-from .chat import router as chat_router
-
-app = FastAPI(
-    title="Conversational Analytics API",
-    description="REST API for Conversational Analytics application", 
-    version="1.0.0"
-)
+app = FastAPI()
 
 # CORS middleware
 frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
@@ -27,6 +17,11 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Import routers after app creation
+from .auth import router as auth_router
+from .agents import router as agents_router  
+from .chat import router as chat_router
 
 # Include routers
 app.include_router(auth_router, prefix="/auth", tags=["authentication"])
@@ -41,5 +36,6 @@ async def root():
 async def health_check():
     return {"status": "healthy"}
 
-# Configure Mangum with lifespan off for Vercel
-handler = Mangum(app, lifespan="off")
+# Handler for Vercel
+from mangum import Mangum
+handler = Mangum(app)
