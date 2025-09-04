@@ -184,7 +184,7 @@ async def validate_token(credentials: HTTPAuthorizationCredentials = Depends(sec
                 )
 
             logger.info("Token validation successful - audience matches")
-            return token_info
+            return {"token": token, "token_info": token_info}
 
     except HTTPException:
         # Re-raise HTTPExceptions as-is

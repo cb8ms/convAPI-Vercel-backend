@@ -62,8 +62,6 @@ class DataAgentResponse(BaseModel):
 
 router = APIRouter()
 
-from .auth import validate_token  # Import the existing auth validation
-
 @router.get("/")
 async def list_agents(token_info = Depends(validate_token)):
     """List all data agents"""
@@ -74,11 +72,11 @@ async def list_agents(token_info = Depends(validate_token)):
     logger.info(f"Token info received: {token_info}")
     try:
         creds = Credentials(
-            token=token_info["access_token"],
+            token=token_info["token"],
             token_uri="https://oauth2.googleapis.com/token",
             client_id=os.getenv("GOOGLE_CLIENT_ID"),
             client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-            scopes=token_info.get("scope", "").split()
+            scopes=token_info["token_info"].get("scope", "").split()
         )
         logger.info(f"Created Google Credentials: {creds}")
 
@@ -136,11 +134,11 @@ async def create_agent(agent_data: DataAgentRequest, token_info = Depends(valida
 
     logger.info(f"Token info received: {token_info}")
     creds = Credentials(
-        token=token_info["access_token"],
+        token=token_info["token"],
         token_uri="https://oauth2.googleapis.com/token",
         client_id=os.getenv("GOOGLE_CLIENT_ID"),
         client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-        scopes=token_info.get("scope", "").split()
+        scopes=token_info["token_info"].get("scope", "").split()
     )
     logger.info(f"Created Google Credentials: {creds}")
     try:
@@ -219,11 +217,11 @@ async def update_agent(agent_name: str, agent_data: DataAgentUpdateRequest, toke
 
     logger.info(f"Token info received: {token_info}")
     creds = Credentials(
-        token=token_info["access_token"],
+        token=token_info["token"],
         token_uri="https://oauth2.googleapis.com/token",
         client_id=os.getenv("GOOGLE_CLIENT_ID"),
         client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-        scopes=token_info.get("scope", "").split()
+        scopes=token_info["token_info"].get("scope", "").split()
     )
     logger.info(f"Created Google Credentials: {creds}")
     try:
@@ -275,11 +273,11 @@ async def delete_agent(project_id: str, location: str, agent_id: str, token_info
 
     logger.info(f"Token info received: {token_info}")
     creds = Credentials(
-        token=token_info["access_token"],
+        token=token_info["token"],
         token_uri="https://oauth2.googleapis.com/token",
         client_id=os.getenv("GOOGLE_CLIENT_ID"),
         client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-        scopes=token_info.get("scope", "").split()
+        scopes=token_info["token_info"].get("scope", "").split()
     )
     logger.info(f"Created Google Credentials: {creds}")
     logger.info(f"Deleting agent with name: {agent_name}")
