@@ -43,8 +43,9 @@ router = APIRouter()
 async def get_google_url():
     """Get Google OAuth authorization URL"""
     try:
+        callback_uri = os.getenv("REDIRECT_URI", "https://conv-api-vercel-backend.vercel.app/api/auth/callback")
         auth_url = await oauth_client.get_authorization_url(
-            REDIRECT_URI,
+            callback_uri,
             scope=SCOPES,
             extras_params={"access_type": "offline"}
         )
@@ -52,11 +53,29 @@ async def get_google_url():
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to get auth URL: {str(e)}")
 
-from fastapi import Request
+from fastapi import Request, Query
+
+@router.get("/callback")
+async def google_callback_get(
+    code: str = Query(None),
+    error: str = Query(None),
+    state: str = Query(None)
+):
+    """Handle OAuth callback from Google"""
+    if error:
+        frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+        return RedirectResponse(url=f"{frontend_url}/?error={error}")
+    
+    if not code:
+        raise HTTPException(status_code=400, detail="Authorization code is required")
+        
+    # Redirect to frontend with the code
+    frontend_url = os.getenv("FRONTEND_URL", "http://localhost:3000")
+    return RedirectResponse(url=f"{frontend_url}/?code={code}")
 
 @router.post("/google/callback")
-async def google_callback(request: Request):
-    """Handle OAuth callback and exchange code for tokens"""
+async def google_callback_post(request: Request):
+    """Handle callback code exchange from frontend"""
     data = await request.json()
     code = data.get('code')
     error = data.get('error')
