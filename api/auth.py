@@ -118,17 +118,9 @@ async def google_callback_post(request: Request):
             "expiry": creds.expiry.isoformat() if creds.expiry else ""
         }
 
-        # Get ID token for the user
-        id_token_info = id_token.verify_oauth2_token(
-            creds.token,
-            requests.Request(),
-            GOOGLE_CLIENT_ID
-        )
-
-        # Return both access token and id token
+        # Return access token directly
         return {
             "access_token": creds.token,
-            "id_token": id_token_info,
             "token_type": "Bearer",
             "expires_in": 3600  # Google's default expiration time
         }

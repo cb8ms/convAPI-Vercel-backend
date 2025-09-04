@@ -72,10 +72,11 @@ async def get_credentials(token_info = Depends(validate_token)):
             token_uri="https://oauth2.googleapis.com/token",
             client_id=os.getenv("GOOGLE_CLIENT_ID"),
             client_secret=os.getenv("GOOGLE_CLIENT_SECRET"),
-            scopes=SCOPES  # Make sure to import SCOPES from auth.py
+            scopes=SCOPES
         )
         return creds
     except Exception as e:
+        print(f"Error creating credentials: {str(e)}")  # Add logging
         raise HTTPException(status_code=401, detail=f"Failed to create credentials: {str(e)}")
 
 @router.get("/")
